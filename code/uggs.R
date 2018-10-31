@@ -1,4 +1,4 @@
-# Created by Yixin Sun in October 2018
+# Created by Yixin Sun and Erik Karsten in October 2018
 # code to calculate bias-corrected confidence intervals
 library(tidyverse)
 library(furrr)
@@ -13,7 +13,7 @@ library(furrr)
 # 7. compute sigma_jackknife
 # 8. compute internal standard error
 
-# let's first do an iteration where m = n
+# split up the bias-correction process from the acceleration calculation
 uggs <- function(df, B, formula, est, ..., m = nrow(df), alpha = c(0.025, 0.05, 0.1)){
 	t0 <- est(formula, data = df)
 
