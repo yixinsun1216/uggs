@@ -1,4 +1,4 @@
-# Created by Yixin Sun and Erik Karsten in October 2018
+# Created by Yixin Sun and Eric Karsten in October 2018
 # code to calculate bias-corrected confidence intervals
 library(tidyverse)
 library(furrr)
