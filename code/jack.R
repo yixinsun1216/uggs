@@ -15,19 +15,21 @@ plan(multiprocess)
 
 furrrjack <- function(df, formula, est, ..., jcount) {
   jack <- function(drop_index) {
-    return(est(formula, df[-drop_index,]))
+    return(est(formula, df[-unlist(drop_index),]))
   }
+  
   # create list of index sets to be jacknifed
   n <- nrow(df)
-  r <- n %% jsize
+  r <- n %% jcount
   indicies <-
     sample(1:n, n-r) %>%
     matrix(jcount) %>%
     t() %>%
     as_tibble() %>%
     as.list()
+
   # compute theta for each jacknife sample
-  theta_j <- future_map_int(indicies , jack) %>% unname()
+  theta_j <- future_map_dbl(indicies , jack) %>% unname()
   return(theta_j)
 }
 
