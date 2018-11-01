@@ -75,8 +75,8 @@ uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5,
 	# pass each sample into estimator
 	boot <- 
 	  dfx_indicies %>%
-	  future_map(function(x) furrrboot(reg_data, x, formula, est), .
-	  								   progress = progress)
+	  future_map(function(x) furrrboot(reg_data, x, formula, est), 
+	  								   .progress = progress)
 
 	# furrrboot returns theta and count vector Y - extract these theta
 	theta_boot <- map_dbl(boot, function(x) x[[1]])
@@ -113,8 +113,9 @@ uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5,
 
 
 	# calculate B.mean
-	B.mean <- c(B, mean(theta_boot))
+	B.mean <- c(as.integer(B), mean(theta_boot))
 
+	stats <- bootstat
 	bca_output <- list(limits = limits, stats = stats, B.mean = B.mean)
 	return(bca_output)
 }
