@@ -20,7 +20,7 @@ bias_ugg <- function(sample, formula, est){
 	t_star <- future_map_dbl(sample, function(x) est(formula, data = x))
 }
 
-# function for calculating bca level-alpha confidenval interval endpoint
+# function for calculating bca level-alpha confidence interval endpoint
 ci_ugg <- function(alpha, t_star, t0, a){
 	alpha <- alpha[alpha < 0.5]
     alpha <- c(alpha, 0.5, rev(1 - alpha))
