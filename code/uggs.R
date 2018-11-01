@@ -22,15 +22,29 @@ source(file.path(root, 'code/jack.R'))
 num.workers <- 4
 plan(multiprocess(workers = eval(num.workers)))
 
+# passing bootstrapped sample into estimating function
+furrrboot <- function(df, i, formula, est){
+	dfx <- df[i,]
+	theta_star <- est(formula, dfx)
+	n <- nrow(dfx)
+
+	# indicidence matrix - count of data used
+	# want to make sure the tabulation contains every index, so we first add in 
+	# vector 1:n and then subtract 1 from count of each index 
+	Yj <- table(c(i, 1:n)) - 1
+
+	return(list(theta = theta_star, Yj = Yj))
+}
 
 # function for calculating bca level-alpha confidence interval endpoint
-ci_ugg <- function(alpha, theta_star, t0, a){
+furrr_bca <- function(alpha, theta_star, t0, a){
 	alpha <- alpha[alpha < 0.5]
     alpha <- c(alpha, 0.5, rev(1 - alpha))
     zalpha <- qnorm(alpha)
     sdboot0 <- sd(theta_star)
 
     # compute bca confidence limits
+    z0 <- stats::qnorm(sum(theta_star < t0)/B)
 	phi <- stats::pnorm(z0 + (z0 + zalpha)/(1 - a * (z0 + zalpha)))
 	perc <- round(phi * B)
 	theta_bca <- sort(theta_star)[perc]
@@ -56,24 +70,47 @@ uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5,
 	t0 <- est(formula, df)
 
 	# create B samples from df
-	dfx <- rerun(B, sample_n(df, n, replace = TRUE))
+	dfx_indicies <- rerun(B, sample(n, n, replace = TRUE))
 
 	# pass each sample into estimator
-	theta_boot <- future_map_dbl(dfx, function(x) est(formula, x), .progress = progress)
+	boot <- 
+	  dfx_indicies %>%
+	  future_map(function(x) furrrboot(reg_data, x, formula, est), .
+	  								   progress = progress)
+
+	# furrrboot returns theta and count vector Y - extract these theta
+	theta_boot <- map_dbl(boot, function(x) x[[1]])
 	se_boot <- sd(theta_boot)
+
+	# use total count vector to calculate sample error
+	Y <-
+	  map(boot, function(x) x[[2]]) %>% 
+	  reduce(function(x, y) rowSums(cbind(x, y)))
+
+	# weight theta by count vector
+	tY <- 
+	  map(boot, function(x) x[[1]] * x[[2]]) %>%
+	  reduce(function(x, y) rowSums(cbind(x, y))) 
+
+	theta_boot_mean <- mean(theta_boot)
+	tY_avg <- tY / B
+	Y_avg <- Y / B
+	s <- n * (tY_avg - theta_boot_mean * Y_avg)
+	u <- 2 * theta_boot_mean - s
+	sdu <- sqrt(sum(u ^ 2)) / n
+
+	# calculate bias corrected estimator and bind with sdu
+	ustat <- 2 * t0 - mean(theta_boot) 
+	bootstat <- c(ustat, sdu)
+	names(bootstat) <- c("ustat", "sdu")
 
 	# calculate a
 	theta_j <- furrrjack(df, formula, est, jcount = jcount)
 	ajack <- a(theta_j)
 
 	# use a to calculate bca level-alpha CI
-	limits <- ci_ugg(alpha, theta_star, t0, ajack)
+	limits <- furrr_bca(alpha, theta_boot, t0, ajack)
 
-
-	# calculate bias-corrected estimator
-	ustat <- 2 * t0 - mean(theta_boot)
-	# figure out how to calculate sampling error sdu????
-	stats <- ustat
 
 	# calculate B.mean
 	B.mean <- c(B, mean(theta_boot))

@@ -13,11 +13,11 @@ plan(multiprocess)
 
 # jreps is the number of times we want to do the random jacknife 
 
-furrrjack <- function(df, formula, est, ..., jcount) {
+furrrjack <- function(df, formula, est, ..., jcount, progress = progress) {
   jack <- function(drop_index) {
     return(est(formula, df[-unlist(drop_index),]))
   }
-  
+
   # create list of index sets to be jacknifed
   n <- nrow(df)
   r <- n %% jcount
@@ -29,7 +29,7 @@ furrrjack <- function(df, formula, est, ..., jcount) {
     as.list()
 
   # compute theta for each jacknife sample
-  theta_j <- future_map_dbl(indicies , jack) %>% unname()
+  theta_j <- future_map_dbl(indicies , jack, .progress = progress) %>% unname()
   return(theta_j)
 }
 
