@@ -22,67 +22,65 @@ source(file.path(root, 'code/jack.R'))
 num.workers <- 4
 plan(multiprocess(workers = eval(num.workers)))
 
-# passing bootstrapped sample into estimating function
-furrrboot <- function(df, i, formula, est){
-	dfx <- df[i,]
-	theta_star <- est(formula, dfx)
-	n <- nrow(dfx)
-
-	# indicidence matrix - count of data used
-	# want to make sure the tabulation contains every index, so we first add in 
-	# vector 1:n and then subtract 1 from count of each index 
-	Yj <- table(c(i, 1:n)) - 1
-
-	return(list(theta = theta_star, Yj = Yj))
-}
-
-# function for calculating bca level-alpha confidence interval endpoint
-furrr_bca <- function(alpha, theta_star, t0, a){
-	alpha <- alpha[alpha < 0.5]
-    alpha <- c(alpha, 0.5, rev(1 - alpha))
-    zalpha <- qnorm(alpha)
-    sdboot0 <- sd(theta_star)
-
-    # compute bca confidence limits
-    z0 <- stats::qnorm(sum(theta_star < t0)/B)
-	phi <- stats::pnorm(z0 + (z0 + zalpha)/(1 - a * (z0 + zalpha)))
-	perc <- round(phi * B)
-	theta_bca <- sort(theta_star)[perc]
-
-	# also compute usual standard errors
-	theta_std <- t0 + sdboot0 * stats::qnorm(alpha)
-    ugg_ci <- cbind(theta_bca, theta_std)
-    dimnames(ugg_ci) <- list(alpha, c("bca", "std"))
-
-    return(ugg_ci)
-}
-
 
 # split up the bias-correction process from the acceleration calculation
-uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5,
+uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5, K =2, J = 10,
 	alpha = c(0.025, 0.05, 0.1), progress = TRUE){
 	## Save rng state
     if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-        stats::runif(1)
+        runif(1)
     seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
 	n <- nrow(df)
 	t0 <- est(formula, df)
 
-	# create B samples from df
+	# create B samples from df and passes each sample into estimator
 	dfx_indicies <- rerun(B, sample(n, n, replace = TRUE))
-
-	# pass each sample into estimator
 	boot <- 
 	  dfx_indicies %>%
 	  future_map(function(x) furrrboot(reg_data, x, formula, est), 
 	  								   .progress = progress)
 
-	# furrrboot returns theta and count vector Y - extract these theta
+	# furrrboot returns list with theta and count vector Y - extract theta
 	theta_boot <- map_dbl(boot, function(x) x[[1]])
 	se_boot <- sd(theta_boot)
 
-	# use total count vector to calculate sample error
+	# calculate a
+	jackoutput <- furrrjack(df, formula, est, jcount = jcount, jreps = jreps, 
+						 	progress = progress)
+	ajack <- jackoutput$`a`
+
+
+	# use a to calculate bca level-alpha CI
+	limits <- furrrgi(alpha, theta_boot, t0, ajack)
+
+	# still have to fill in sdboot
+    z0 <- qnorm(sum(theta_boot < t0)/B)
+    sdboot <- sd(theta_boot)
+
+	# calculate internal errors and average across K calculations
+	ie <- rerun(K, internal_error(theta_boot, B, J, ajack, alpha, t0))
+	jacksd <- 
+	  ie %>%
+	  map(function(x) x$`jacksd`) %>%
+	  reduce(cbind) %>%
+	  split(seq(nrow(.))) %>%
+	  map_dbl(mean)
+	limits <- cbind(limits, jacksd)
+
+	jsd <- 
+	  ie %>%
+	  map(function(x) x$jsd) %>%
+	  reduce(cbind) %>%
+	  split(seq(nrow(.))) %>%
+	  map_dbl(mean)
+	jsd <- c(0, jsd, 0, 0)
+	stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$sdjack), jsd))
+	rownames(stats) <- c("est", "jsd")
+	colnames(stats) <- c("theta", "sdboot", "z0", "a", "sdjack")
+
+	
+    # use total count vector to calculate sample error aka black magic sdu
 	Y <-
 	  map(boot, function(x) x[[2]]) %>% 
 	  reduce(function(x, y) rowSums(cbind(x, y)))
@@ -101,21 +99,13 @@ uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5,
 
 	# calculate bias corrected estimator and bind with sdu
 	ustat <- 2 * t0 - mean(theta_boot) 
-	bootstat <- c(ustat, sdu)
-	names(bootstat) <- c("ustat", "sdu")
+	ustats <- c(ustat, sdu)
+	names(ustats) <- c("ustat", "sdu")
 
-	# calculate a
-	theta_j <- furrrjack(df, formula, est, jcount = jcount)
-	ajack <- a(theta_j)
-
-	# use a to calculate bca level-alpha CI
-	limits <- furrr_bca(alpha, theta_boot, t0, ajack)
+	options(scipen=999)
+	B.mean <- c(B, mean(theta_boot))
 
 
-	# calculate B.mean
-	B.mean <- c(as.integer(B), mean(theta_boot))
-
-	stats <- bootstat
-	bca_output <- list(limits = limits, stats = stats, B.mean = B.mean)
+	bca_output <- list(limits = limits, stats = stats, B.mean = B.mean, ustats = ustats)
 	return(bca_output)
 }

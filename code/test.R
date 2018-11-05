@@ -1,11 +1,16 @@
 library(tidyverse)
 library(furrr)
 library(alpaca)
+library(microbenchmark)
+library(bcaboot)
 
 if(Sys.getenv("USERNAME") == "Yixin Sun"){
 	root <- "C:/Users/Yixin Sun/Documents/Github/uggs"
 	ddir <- "C:/Users/Yixin Sun/Documents/Dropbox/texas"
 }
+setwd(root)
+
+source(file.path(root, "code/uggs.R"))
 
 #===========================================================================
 # LOAD DATA CLEANED IN SAMPLE_SELECTION.R
@@ -34,19 +39,32 @@ reg_data <-
          CountyYr = as.integer(CountyYr),
          YearQtr = as.integer(YearQtr))
 
-controls <- c("log(acres)")
-loctime_feglm <- "CountyYr + YearQtr"
 
-rhs <-
-  paste("Auction", controls, sep = " + ") %>%
-  paste(loctime_feglm, sep = " | ")
-
-
-f <- 
-  paste("drilled", rhs, sep = " ~ ") %>%
-  as.formula
-
+f <- as.formula("drilled ~ Auction + log(acres) | CountyYr + YearQtr")
 poisson_test <- function(formula, df){
   m <- feglm(formula, df, family = poisson())
   return(as.numeric(coef(m)["Auction"]))
 }
+
+check <- uggs(reg_data, 2000, f, poisson_test, jcount = 80, jreps = 5,
+	alpha = c(0.025, 0.05, 0.1, .16), progress = TRUE)
+
+
+# make data into matrix and use in bcajack function
+reg_matrix <-
+  reg_data %>%
+  select(drilled, Auction, acres, CountyYr, YearQtr) %>%
+  as.matrix
+
+poisson_test_og <- function(x){
+	f <- "drilled ~ Auction + log(acres) | CountyYr + YearQtr"
+	df <- 
+	  as_tibble(x) %>%
+	  setNames(c("drilled", "Auction", "acres", "CountyYr", "YearQtr"))
+	m <- feglm(as.formula(f), df, family = poisson())
+  	return(as.numeric(coef(m)["Auction"]))
+}
+
+
+print(system.time(bca_check <- bcajack(reg_matrix, 2000, poisson_test_og, m = 80)))
+print(system.time(check <- uggs(reg_data, 2000, f, poisson_test, jcount = 80)))

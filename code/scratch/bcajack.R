@@ -177,16 +177,16 @@ bcajack <- function(x, B, func, ..., m = nrow(x), mr = 5, K = 2, J = 10,
         if (verbose) pb <- utils::txtProgressBar(min = 0, max = B, style = 3)
         for (j in seq_len(B)) {
             ij <- sample(x = n, size = n, replace = TRUE)
-            Yj <- table(c(ij, 1:n)) - 1
+            Yj <- table(c(ij, 1:n)) - 1 # length n
             tt[j] <- func(x[ij, ], ...)
             tY. <- tY. + tt[j] * Yj
-            Y. <- Y. + Yj
+            Y. <- Y. + Yj # length n
             if (verbose) utils::setTxtProgressBar(pb, j)
         }
         if (verbose) close(pb)
         tt. <- mean(tt)
         tY. <- tY./B
-        Y. <- Y./B
+        Y. <- Y./B # length n
         s. <- n * (tY. - tt. * Y.)
         u. <- 2 * t. - s.
         sdu <- sqrt(sum(u.^2))/n
