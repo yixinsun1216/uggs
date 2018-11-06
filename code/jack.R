@@ -60,7 +60,7 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
         as_tibble() %>%
         as.list()
 
-  internal_jack <- function(alpha, t0, theta_star, drop_index, ajack){
+  internal_jack <- function(){
     ttj <- theta_star[-drop_index]
     Bj <- length(ttj)
     sdboot <- sd(ttj)
@@ -106,7 +106,21 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
 # jreps is the number of times we want to do the random jacknife 
 
 furrrjack <- function(df, formula, est, ..., jcount, jreps, progress = progress) {
-  jack <- function(df, jcount) {
+  a <- function() {
+    theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
+    aj <- 1/6 * sum((theta_j - theta_dot)^3) / ((sum((theta_j - theta_dot)^2))^1.5)
+    return(aj)
+  }
+
+  # function that gives the standard error
+  se_jack <- function() {
+    n <- length(theta_j)
+    theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
+    se <- sqrt(sum(theta_dot^2)) / sqrt(jcount * (jcount - 1))
+    return(se)
+  }
+
+  jack <- function() {
     n <- nrow(df)
     r <- n %% jcount
 
@@ -152,16 +166,3 @@ furrrjack <- function(df, formula, est, ..., jcount, jreps, progress = progress)
 
 
 # function that turns jacknife thetas into `a`
-a <- function(theta_j, jcount) {
-  theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
-  aj <- 1/6 * sum((theta_j - theta_dot)^3) / ((sum((theta_j - theta_dot)^2))^1.5)
-  return(aj)
-}
-
-# function that gives the standard error
-se_jack <- function(theta_j, jcount) {
-  n <- length(theta_j)
-  theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
-  se <- sqrt(sum(theta_dot^2)) / sqrt(jcount * (jcount - 1))
-  return(se)
-}
