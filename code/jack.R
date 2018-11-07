@@ -24,8 +24,8 @@ furrrgi <- function(alpha, theta_star, t0, a){
     theta_bca %>%
     map(function(x) sum(theta_star <= x) / B)
 
-  ugg_ci <- cbind(theta_bca, pct, theta_std)
-  dimnames(ugg_ci) <- list(alpha, c("bca", "pct", "std"))
+  ugg_ci <- cbind(theta_bca, theta_std, pct)
+  dimnames(ugg_ci) <- list(alpha, c("bca", "std", "pct"))
 
   return(ugg_ci)
 }
@@ -34,59 +34,45 @@ furrrgi <- function(alpha, theta_star, t0, a){
 # These use a different jackknife calculation, which are based on the 
 # original B bootstrap replications.
 # The B-vector theta_star is divided into J groups, and each group is deleted
-# in turn to recompute the limits. 
-# This is done K times, and averaged to get jackknife estimates 
+# in turn to recompute the limits.
 furrrie <- function(theta_star, B, J, ajack, alpha, t0){
   indicies <-
-        sample(B, size = B) %>%
-        matrix(ncol = J) %>%
-        as_tibble() %>%
-        as.list()
+    sample(B, B - B %% J) %>%
+    matrix(J) %>%
+    t() %>%
+    as_tibble() %>%
+    as.list()
 
   internal_jack <- function(drop_index){
     ttj <- theta_star[-drop_index]
     Bj <- length(ttj)
     sdboot <- sd(ttj)
-    
-    limit_j <- unlist(furrrgi(alpha, ttj, t0, ajack)[,"bca"])
     z0 <- qnorm(sum(ttj < t0)/B)
-
-    stats_j <- c(sdboot, z0)
-
-    return(list(limit = limit_j, stats = stats_j))
+    limit_j <- unlist(furrrgi(alpha, ttj, t0, ajack)[,"bca"]) %>% as.numeric()
+    out <- c(limit_j, sdboot, z0)
+    names(out) <- c(as.character(alpha),"sdboot", "z0")
+    return(as.list(out))
   }
 
-  int_sd <- future_map(indicies, function(x) internal_jack(x))
+  int_sd <-
+    future_map(indicies, function(x) internal_jack(x)) %>%
+    bind_rows %>%
+    map_df(function(x) {sd(x) * (J-1)/(sqrt(J))})
 
-  limits <- 
-    int_sd %>%
-    map(function(x) x$`limit`) %>%
-    reduce(cbind) %>%
-    split(seq(nrow(.))) %>%
-    map_dbl(sd)
-  limits <- limits * (J - 1) / sqrt(J)
-
-  stats <- 
-    int_sd %>%
-    map(function(x) x$stats) %>%
-    reduce(cbind) %>%
-    split(seq(nrow(.))) %>%
-    map_dbl(sd)
-    stats <- stats * (J - 1) / sqrt(J)
-    names(stats) <- c("sdboot", "z0")
-
-    return(list(jacksd = limits, jsd = stats))
+  return(int_sd)
 }
-
 
 # function that takes in data, formula, function to estimate, jcount, jreps,
 #   and spits out the value accelaration value a and jacknife standard deviation
 # jcount is how many jacknifes we want to do, defaulting to number of rows
 # jreps is the number of times we want to do the random jacknife 
-furrrjack <- function(df, formula, est, jcount, n, ...) {
+furrrjack <- function(df, formula, est, jcount,...) {
+  n <- nrow(df)
+  r <- n %% jcount
+  
   # create list of index sets to be jacknifed
   indicies <-
-    sample(1:n, n- n %% jcount) %>%
+    sample(1:n, n-r) %>%
     matrix(jcount) %>%
     t() %>%
     as_tibble() %>%

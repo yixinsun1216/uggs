@@ -50,29 +50,22 @@ uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5,
 	  bind_rows() %>%
 	  colMeans() %>%
 	  as.list()
-	ajack <- jackoutput$`a`
+	ajack <- jackoutput$a
 	
 	# use a to calculate bca level-alpha CI
 	limits <- furrrgi(alpha, theta_boot, t0, ajack)
 
 	# calculate internal errors and average across iereps calculations
-	ie <- rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0))
-	jacksd <- 
-	  ie %>%
-	  map(function(x) x$`jacksd`) %>%
-	  reduce(cbind) %>%
-	  split(seq(nrow(.))) %>%
-	  map_dbl(mean)
+	ie <-
+	  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0)) %>%
+	  bind_rows() %>%
+	  map_df(mean)
+	
+	jacksd <- unlist(ie)[1:length(alpha)]
 	limits <- cbind(limits, jacksd)
 
-	jsd <- 
-	  ie %>%
-	  map(function(x) x$jsd) %>%
-	  reduce(cbind) %>%
-	  split(seq(nrow(.))) %>%
-	  map_dbl(mean)
-	jsd <- c(0, jsd, 0, 0)
-	stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$sdjack), jsd))
+	jsd <- c(0, ie$sdboot, ie$z0, 0, 0)
+	stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$se), jsd))
 	rownames(stats) <- c("est", "jsd")
 	colnames(stats) <- c("theta", "sdboot", "z0", "a", "sdjack")
 	
@@ -99,14 +92,14 @@ uggs <- function(df, B, formula, est, ..., jcount = nrow(df), jreps = 5,
 	sdu <- sqrt(sum(u ^ 2)) / n
 
 	# calculate bias corrected estimator and bind with sdu
-	ustat <- 2 * t0 - mean(theta_boot) 
+	ustat <- 2 * t0 - theta_boot_mean 
 	ustats <- c(ustat, sdu)
 	names(ustats) <- c("ustat", "sdu")
 
 	options(scipen=999)
-	B.mean <- c(B, mean(theta_boot))
+	B.mean <- c(B, theta_boot_mean)
 
-
-	bca_output <- list(limits = limits, stats = stats, B.mean = B.mean, ustats = ustats)
+	bca_output <- list(limits = limits, stats = stats,
+	                   B.mean = B.mean, ustats = ustats)
 	return(bca_output)
 }
