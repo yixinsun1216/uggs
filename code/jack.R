@@ -3,24 +3,7 @@
 library(tidyverse)
 library(furrr)
 
-plan(multiprocess)
-
-
-# passing bootstrapped sample into estimating function
-furrrboot <- function(df, i, formula, est){
-  dfx <- df[i,]
-  theta_star <- est(formula, dfx)
-  n <- nrow(dfx)
-
-  # indicidence matrix - count of data used
-  # want to make sure the tabulation contains every index, so we first add in 
-  # vector 1:n and then subtract 1 from count of each index 
-  Yj <- table(c(i, 1:n)) - 1
-
-  return(list(theta = theta_star, Yj = Yj))
-}
-
-# function for calculating bca level-alpha confidence interval endpoint - aka G inverse
+# function for calculating bca level-alpha confidence interval endpoint: G^{-1}
 furrrgi <- function(alpha, theta_star, t0, a){
   B <- length(theta_star)
   alpha <- alpha[alpha < 0.5]
@@ -31,18 +14,18 @@ furrrgi <- function(alpha, theta_star, t0, a){
   # compute bca confidence limits
   z0 <- qnorm(sum(theta_star < t0)/B)
   phi <- pnorm(z0 + (z0 + zalpha)/(1 - a * (z0 + zalpha)))
-  perc <- round(phi * B)
-  theta_bca <- sort(theta_star)[perc]
+  theta_bca <- sort(theta_star)[round(phi * B)]
 
   # also compute usual standard errors
   theta_std <- t0 + sdboot0 * qnorm(alpha)
-    
+  
+  # compute proportion of bootstrapped estimates which are less than conf limit
   pct <- 
     theta_bca %>%
     map(function(x) sum(theta_star <= x) / B)
 
-  ugg_ci <- cbind(theta_bca, theta_std, pct)
-  dimnames(ugg_ci) <- list(alpha, c("bca", "std", "pct"))
+  ugg_ci <- cbind(theta_bca, pct, theta_std)
+  dimnames(ugg_ci) <- list(alpha, c("bca", "pct", "std"))
 
   return(ugg_ci)
 }
@@ -60,7 +43,7 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
         as_tibble() %>%
         as.list()
 
-  internal_jack <- function(){
+  internal_jack <- function(drop_index){
     ttj <- theta_star[-drop_index]
     Bj <- length(ttj)
     sdboot <- sd(ttj)
@@ -73,7 +56,7 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
     return(list(limit = limit_j, stats = stats_j))
   }
 
-  int_sd <- future_map(indicies, function(x) internal_jack(alpha, t0, theta_star, x, ajack))
+  int_sd <- future_map(indicies, function(x) internal_jack(x))
 
   limits <- 
     int_sd %>%
@@ -93,76 +76,34 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
     names(stats) <- c("sdboot", "z0")
 
     return(list(jacksd = limits, jsd = stats))
-
 }
 
 
 # function that takes in data, formula, function to estimate, jcount, jreps,
-# and spits out a jacknife theta estimates
-
-# jcount is how many jacknifes we want to do, defaulting to number of rows,
-# in the old code this was `m`
-
+#   and spits out the value accelaration value a and jacknife standard deviation
+# jcount is how many jacknifes we want to do, defaulting to number of rows
 # jreps is the number of times we want to do the random jacknife 
-
-furrrjack <- function(df, formula, est, ..., jcount, jreps, progress = progress) {
-  a <- function() {
-    theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
-    aj <- 1/6 * sum((theta_j - theta_dot)^3) / ((sum((theta_j - theta_dot)^2))^1.5)
-    return(aj)
-  }
-
-  # function that gives the standard error
-  se_jack <- function() {
-    n <- length(theta_j)
-    theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
-    se <- sqrt(sum(theta_dot^2)) / sqrt(jcount * (jcount - 1))
-    return(se)
-  }
-
-  jack <- function() {
-    n <- nrow(df)
-    r <- n %% jcount
-
-    # create list of index sets to be jacknifed
-    indicies <-
-      sample(1:n, n-r) %>%
-      matrix(jcount) %>%
-      t() %>%
-      as_tibble() %>%
-      as.list()
-
-    # estimates theta without sampled subgroup
-    theta_j <- 
-      indicies %>%
-      future_map_dbl(function(x) 
-                     est(formula, df[-unlist(x),]), .progress = progress) %>% 
-      unname()
-
-    # calculate a
-    aj <- a(theta_j, jcount)
-    ssj <- se_jack(theta_j, jcount)
+furrrjack <- function(df, formula, est, jcount, n, ...) {
+  # create list of index sets to be jacknifed
+  indicies <-
+    sample(1:n, n- n %% jcount) %>%
+    matrix(jcount) %>%
+    t() %>%
+    as_tibble() %>%
+    as.list()
   
-    return(list(a = aj, ssj = ssj))
-  }
-
-  # run calculation of jacknife theta estimates jrep times
-  aij <- rerun(jreps, jack(df, jcount))
-
-  # jack() returns the a and jackknife estimate of standard error
-  # extract these 2 elements and average the jreps 
-  a <- 
-    aij %>%
-    map_dbl(function(x) x[[1]]) %>%
-    mean
-
-  sdjack <- 
-    aij %>%
-    map_dbl(function(x) x[[2]]) %>%
-    mean
+  # estimates theta without sampled subgroup
+  theta_j <- 
+    indicies %>%
+    future_map_dbl(function(x) 
+      est(formula, df[-unlist(x),]), .progress = progress) %>% 
+    unname()
   
-  return(list(a = a, sdjack = sdjack))
+  # calculate acceleration a and jacknife standard error
+  theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
+  a_j <- 1/6 * sum((theta_j - theta_dot)^3) /
+    ((sum((theta_j - theta_dot)^2))^1.5)
+  se_j <- sqrt(sum(theta_dot^2)) / sqrt(jcount * (jcount - 1))
+  
+  return(list(a = a_j, se = se_j))
 }
-
-
-# function that turns jacknife thetas into `a`

@@ -8,8 +8,11 @@ if(Sys.getenv("USERNAME") == "Yixin Sun"){
 	root <- "C:/Users/Yixin Sun/Documents/Github/uggs"
 	ddir <- "C:/Users/Yixin Sun/Documents/Dropbox/texas"
 }
+if(Sys.getenv("USERNAME") == "erict"){
+  root <- "C:/Users/erict/Documents/thom/uggs"
+  ddir <- "C:/Users/erict/Dropbox/texas"
+}
 setwd(root)
-
 source(file.path(root, "code/uggs.R"))
 
 #===========================================================================
@@ -46,8 +49,8 @@ poisson_test <- function(formula, df){
   return(as.numeric(coef(m)["Auction"]))
 }
 
-check <- uggs(reg_data, 2000, f, poisson_test, jcount = 80, jreps = 5,
-	alpha = c(0.025, 0.05, 0.1, .16), progress = TRUE)
+#check <- uggs(reg_data, 2000, f, poisson_test, jcount = 80, jreps = 5,
+#	alpha = c(0.025, 0.05, 0.1, .16), progress = TRUE)
 
 
 # make data into matrix and use in bcajack function
@@ -65,6 +68,7 @@ poisson_test_og <- function(x){
   	return(as.numeric(coef(m)["Auction"]))
 }
 
-
+set.seed(12345)
 print(system.time(bca_check <- bcajack(reg_matrix, 2000, poisson_test_og, m = 80)))
+set.seed(12345)
 print(system.time(check <- uggs(reg_data, 2000, f, poisson_test, jcount = 80)))
