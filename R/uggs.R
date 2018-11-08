@@ -1,25 +1,40 @@
-# Created by Yixin Sun and Eric Karsten in October 2018
-# code to calculate bias-corrected confidence intervals
+## Version of November 8, 2018
+
+
+#' @title Nonparametric bias-corrected and accelerated bootstrap confidence
+#'   limits
+#'
+#' @description This routine computes nonparametric confidence limits for
+#'   bootstrap estimates.
+#'
+#' @details Bootstrap confidence limits correct the standard method of
+#' confidence intervals in three ways
+#'
+#' - the bootstrap cdf, \eqn{G} - the bias-correction number \eqn{z_{0} - the
+#' acceleration number \eqn{a} that measures the rate of change in
+#' \eqn{\sigma_{t_0}} as the data changes.
+#'
+
 
 #' @importFrom magrittr %>%
 #' @importFrom tibble tibble
 #' @importFrom purrr map map2_df map_df
 #' @importFrom stats cov dnorm lm pnorm qnorm runif sd var
 
-# Main function 
+# Main function
 #' @export
 uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
                  iereps = 2, J = 10, alpha = c(0.025, 0.05, 0.1),
                  progress = TRUE, num.workers = 4){
 
 	plan(multiprocess(workers = eval(num.workers)))
-	
+
 	n <- nrow(df)
 	t0 <- est(df, ...)
 
 	# create B samples from df and pass each sample into estimator
 	bootstrap_indicies <- rerun(B, sample(n, n, replace = TRUE))
-	theta_boot <- 
+	theta_boot <-
 	  bootstrap_indicies %>%
 	  future_map_dbl(function(i) {est(df[i,])}, .progress = progress)
 	z0 <- qnorm(sum(theta_boot < t0)/B)
@@ -33,7 +48,7 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	  colMeans() %>%
 	  as.list()
 	ajack <- jackoutput$a
-	
+
 	# use a to calculate bca level-alpha CI
 	limits <- furrrgi(alpha, theta_boot, t0, ajack)
 
@@ -42,7 +57,7 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0)) %>%
 	  bind_rows() %>%
 	  map_df(mean)
-	
+
 	jacksd <- unlist(ie)[1:(length(alpha) * 2 + 1)]
 	limits <- cbind(limits, jacksd)
 
@@ -50,10 +65,10 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$se), jsd))
 	rownames(stats) <- c("est", "jsd")
 	colnames(stats) <- c("theta", "sdboot", "z0", "a", "sdjack")
-	
+
   # use total count vector to calculate sample error
 	Y <-
-	  bootstrap_indicies %>% 
+	  bootstrap_indicies %>%
 	  unlist() %>%
 	  c(1:n) %>%
 	  table() - 1
@@ -74,7 +89,7 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	sdu <- sqrt(sum(u ^ 2)) / n
 
 	# calculate bias corrected estimator and bind with sdu
-	ustat <- 2 * t0 - theta_boot_mean 
+	ustat <- 2 * t0 - theta_boot_mean
 	ustats <- c(ustat, sdu)
 	names(ustats) <- c("ustat", "sdu")
 
@@ -106,7 +121,7 @@ furrrgi <- function(alpha, theta_star, t0, a){
 	theta_std <- t0 + sdboot0 * qnorm(alpha)
 
 	# compute proportion of bootstrapped estimates which are less than conf limit
-	pct <- 
+	pct <-
 	  theta_bca %>%
 	  map(function(x) sum(theta_star <= x) / B)
 
@@ -118,7 +133,7 @@ furrrgi <- function(alpha, theta_star, t0, a){
 
 
 # Function for calculating the internal error of the confidence limits
-# These use a different jackknife calculation, which are based on the 
+# These use a different jackknife calculation, which are based on the
 # original B bootstrap replications.
 # The B-vector theta_star is divided into J groups, and each group is deleted
 # in turn to recompute the limits.
@@ -157,7 +172,7 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
 # function that takes in data, function to estimate, jcount, jreps,
 #   and spits out the value accelaration value a and jacknife standard deviation
 # jcount is how many jacknifes we want to do, defaulting to number of rows
-# jreps is the number of times we want to do the random jacknife 
+# jreps is the number of times we want to do the random jacknife
 furrrjack <- function(df, est, jcount,...) {
 	n <- nrow(df)
 	r <- n %% jcount
@@ -171,10 +186,10 @@ furrrjack <- function(df, est, jcount,...) {
 	  as.list()
 
 	# estimates theta without sampled subgroup
-	theta_j <- 
+	theta_j <-
 	  indicies %>%
-	  future_map_dbl(function(x) 
-	    est(df[-unlist(x),])) %>% 
+	  future_map_dbl(function(x)
+	    est(df[-unlist(x),])) %>%
 	  unname()
 
 	# calculate acceleration a and jacknife standard error
