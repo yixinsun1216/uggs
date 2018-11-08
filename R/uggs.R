@@ -1,9 +1,13 @@
 # Created by Yixin Sun and Eric Karsten in October 2018
 # code to calculate bias-corrected confidence intervals
-library(tidyverse)
-library(furrr)
-    
+
+#' @importFrom magrittr %>%
+#' @importFrom tibble tibble
+#' @importFrom purrr map map2_df map_df
+#' @importFrom stats cov dnorm lm pnorm qnorm runif sd var
+
 # Main function 
+#' @export
 uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
                  iereps = 2, J = 10, alpha = c(0.025, 0.05, 0.1),
                  progress = TRUE, num.workers = 4){
