@@ -80,12 +80,11 @@
 	#'     and an estimate, `sdu`, of its sampling error
 #' }
 #' 
-#' @references Efron, Bradley, and Trevor J. Hastie (2017). Computer Age 
-#' 		Statistical Inference: Algorithms, Evidence, and Data Science. 
-#' 		Cambridge University Press.
-#' @references B. Efron and B. Narasimhan. Automatic Construction of
-#'     Bootstrap Confidence Intervals, 2018.
-
+#' @references Efron, Bradley, and Trevor J. Hastie. Computer Age Statistical 
+#' 		Inference: Algorithms, Evidence, and Data Science. Cambridge University 
+#' 		Press, 2017.
+#' @references Efron, Brad, and Balasubramanian Narasimhan. The Automatic 
+#' 		Construction of Bootstrap Confidence Intervals. 2018.
 #' @importFrom magrittr %>%
 #' @importFrom tibble tibble
 #' @importFrom purrr map map2_df map_df
