@@ -98,11 +98,9 @@ intervals in three ways:
 }
 }
 \references{
-DiCiccio T and Efron B (1996). Bootstrap confidence
-    intervals. Statistical Science 11, 189-228
-
-Efron B (1987). Better bootstrap confidence
-    intervals. JASA 82 171-200
+Efron, Bradley, and Trevor J. Hastie (2017). Computer Age 
+		Statistical Inference: Algorithms, Evidence, and Data Science. 
+		Cambridge University Press.
 
 B. Efron and B. Narasimhan. Automatic Construction of
     Bootstrap Confidence Intervals, 2018.
