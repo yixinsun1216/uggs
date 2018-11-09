@@ -7,17 +7,103 @@
 \usage{
 uggs(df, B, est, ..., jcount = nrow(df), jreps = 5, iereps = 2,
   J = 10, alpha = c(0.025, 0.05, 0.1), progress = TRUE,
-  num.workers = 4)
+  num_workers = 4)
+}
+\arguments{
+\item{df}{a dataframe with \eqn{n} rows, assumed to be independently sampled 
+from the target population.}
+
+\item{B}{number of bootstrap replications}
+
+\item{est}{function of the estimating equation, \eqn{\hat{\theta} = est(x)}, 
+which returns a real value for the parameter of interest}
+
+\item{...}{additional arguments for est}
+
+\item{jcount}{value used in calculating a. Because n can get very large, 
+calculating \eqn{n} jackknife values can be slow. A way to speed up the 
+calculation is to collect the \eqn{n} observations into \eqn{jcount} 
+groups and deleting each group in turn. Thus we only 
+evaluate \eqn{jcount} calculations instead of \eqn{n}.}
+
+\item{jreps}{number of repetitions of grouped jackknives. These \eqn{jreps}
+calculations are averaged to obtain our \eqn{\hat{a}}.}
+
+\item{iereps}{a separate jackknife calculation estimates the 
+internal standard error. The \eqn{B}-length vector \eqn{theta^*} is 
+   randomly grouped into \eqn{J} groups, and each group is deleted in turn
+   to recompute our estimates. This is done \eqn{iereps} times and 
+   averaged to compute the final jackknife estimates.}
+
+\item{J}{the number of groups \eqn{B}-length vector \eqn{theta^*} is 
+partitioned into to calculate internal standard error}
+
+\item{alpha}{percentiles to be computed for the confidence limits. Providing
+alpha values below 0.5 is sufficient; upper limits are automatically 
+computed}
+
+\item{progress}{logical for a progress bar in bootstrap calculations}
+
+\item{num_workers}{the number of workers used for parallel processing}
+}
+\value{
+a named list
+
+\itemize{
+\item __limits__ : four columns housing information on confidence limits
+\itemize{	
+   \item `bca` shows the empirical bca confidence limits
+		at the alpha percentiles
+   \item `std` shows the the standard confidence limits, 
+     \eqn{\hat{\theta} + \hat{\sigma}z_{\alpha}}
+   \item `pct` gives the percentiles of the sorted B bootstrap replications 
+     that correspond to `bca`
+   \item `pct`, gives the percentiles of the ordered B bootstrap replications
+     corresponding to the bca limits
+   \item `jacksd` is internal standard errors for the bca limits
+}
+\item __stats__ : top line of stats shows 5 estimates, and bottom line gives the 
+		internal standard errors for the five quantities below:
+\itemize{
+   \item theta: \eqn{f(x)}, original point estimate of the parameter of
+    interest
+	  \item `sdboot` is the bootstrap estimate of standard error;
+	  \item `z0` is the bca bias correction value, in this case quite
+    negative
+	  \item `a` is the _acceleration_, a component of the bca
+    limits (nearly zero here)
+	  \item `sdjack` is the jackknife estimate
+    of standard error for theta. 
+}
+\item __B.mean__ : bootstrap sample size B, and the mean of the B
+    bootstrap replications \eqn{\hat{\theta^*}}
+
+\item __ustats__ : The bias-corrected estimator `2 * t0 - mean(tt)`,
+    and an estimate, `sdu`, of its sampling error
+}
 }
 \description{
 This routine computes nonparametric confidence limits for
   bootstrap estimates.
 }
 \details{
-Bootstrap confidence limits correct the standard method of
-confidence intervals in three ways
+Bootstrap confidence limits correct the standard method of confidence 
+intervals in three ways:
 
-- the bootstrap cdf, \eqn{G} - the bias-correction number \eqn{<<latex>>}{<<plain>>}{eqn{G}} - the
-acceleration number ${a}$ that measures the rate of change in
-\eqn{\sigma_{t_0}} as the data changes.
+\enumerate{
+\item param the bootstrap cdf, \eqn{G}
+\item the bias-correction number \eqn{z_{0}} 
+\item the acceleration number \eqn{a} that measures the rate of change in 
+  \eqn{\sigma_{t_0}} as the data changes.
+}
+}
+\references{
+DiCiccio T and Efron B (1996). Bootstrap confidence
+    intervals. Statistical Science 11, 189-228
+
+Efron B (1987). Better bootstrap confidence
+    intervals. JASA 82 171-200
+
+B. Efron and B. Narasimhan. Automatic Construction of
+    Bootstrap Confidence Intervals, 2018.
 }
