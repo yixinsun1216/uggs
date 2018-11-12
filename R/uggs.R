@@ -96,7 +96,7 @@
 #' 
 #' ## creating left hand side y
 #' u <- rnorm(length(x1))
-#' y <- x1 + 2*x2 + fe_effs[fe] + u
+#' y <- 2 * x1 + x2 + fe_effs[fe] + u
 #' 
 #' # create dataframe to pass into uggs
 #' df_test <- as.data.frame(cbind(y, x1, x2, fe))
