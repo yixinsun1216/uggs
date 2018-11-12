@@ -80,6 +80,35 @@
 	#'     and an estimate, `sdu`, of its sampling error
 #' }
 #' 
+#' @examples
+#' library(lfe)
+#' library(uggs)
+#' 
+#' ## create covariates
+#' x1 <- rnorm(1000)
+#' x2 <- rnorm(length(x1))
+#' 
+#' ## fixed effects
+#' fe <- factor(sample(20, length(x1), replace=TRUE))
+#' 
+#' ## effects for fe
+#' fe_effs <- rnorm(nlevels(fe))
+#' 
+#' ## creating left hand side y
+#' u <- rnorm(length(x1))
+#' y <- x1 + 2*x2 + fe_effs[fe] + u
+#' 
+#' # create dataframe to pass into uggs
+#' df_test <- as.data.frame(cbind(y, x1, x2, fe))
+#' 
+#' # function that returns parameter of interest, x1
+#' est_test <- function(df){
+#' 	m <- felm(y ~ x1 + x2 | fe, df)
+#' 	as.numeric(coef(m)["x1"])
+#' }
+#' 
+#' x1_boot <- uggs(df_test, 1000, est_test, jcount = 40, jreps = 5)
+#' 
 #' @references Efron, Bradley, and Trevor J. Hastie. Computer Age Statistical 
 #' 		Inference: Algorithms, Evidence, and Data Science. Cambridge University 
 #' 		Press, 2017.
@@ -91,6 +120,7 @@
 #' @importFrom stats cov dnorm lm pnorm qnorm runif sd var
 #' @importFrom furrr future_map_dbl future_map 
 #' @importFrom future plan multiprocess
+#' 
 
 
 
