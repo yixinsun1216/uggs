@@ -50,7 +50,7 @@ computed}
 a named list
 
 \itemize{
-\item __limits__ : four columns housing information on confidence limits
+\item limits: four columns housing information on confidence limits
 \itemize{	
    \item `bca` shows the empirical bca confidence limits
 		at the alpha percentiles
@@ -62,7 +62,7 @@ a named list
      corresponding to the bca limits
    \item `jacksd` is internal standard errors for the bca limits
 }
-\item __stats__ : top line of stats shows 5 estimates, and bottom line gives the 
+\item stats: top line of stats shows 5 estimates, and bottom line gives the 
 		internal standard errors for the five quantities below:
 \itemize{
    \item theta: \eqn{f(x)}, original point estimate of the parameter of
@@ -75,10 +75,10 @@ a named list
 	  \item `sdjack` is the jackknife estimate
     of standard error for theta. 
 }
-\item __B.mean__ : bootstrap sample size B, and the mean of the B
+\item B.mean: bootstrap sample size B, and the mean of the B
     bootstrap replications \eqn{\hat{\theta^*}}
 
-\item __ustats__ : The bias-corrected estimator `2 * t0 - mean(tt)`,
+\item ustats: The bias-corrected estimator `2 * t0 - mean(tt)`,
     and an estimate, `sdu`, of its sampling error
 }
 }
@@ -98,10 +98,10 @@ intervals in three ways:
 }
 }
 \references{
-Efron, Bradley, and Trevor J. Hastie (2017). Computer Age 
-		Statistical Inference: Algorithms, Evidence, and Data Science. 
-		Cambridge University Press.
+Efron, Bradley, and Trevor J. Hastie. Computer Age Statistical 
+		Inference: Algorithms, Evidence, and Data Science. Cambridge University 
+		Press, 2017.
 
-B. Efron and B. Narasimhan. Automatic Construction of
-    Bootstrap Confidence Intervals, 2018.
+Efron, Brad, and Balasubramanian Narasimhan. The Automatic 
+		Construction of Bootstrap Confidence Intervals. 2018.
 }

@@ -48,7 +48,7 @@
 #' @return a named list
 #' 
 #' \itemize{
-	#' \item __limits__ : four columns housing information on confidence limits
+	#' \item limits: four columns housing information on confidence limits
 	#' \itemize{	
 	#'    \item `bca` shows the empirical bca confidence limits
 	#' 		at the alpha percentiles
@@ -60,7 +60,7 @@
 	#'      corresponding to the bca limits
 	#'    \item `jacksd` is internal standard errors for the bca limits
 	#' }
-	#' \item __stats__ : top line of stats shows 5 estimates, and bottom line gives the 
+	#' \item stats: top line of stats shows 5 estimates, and bottom line gives the 
 	#' 		internal standard errors for the five quantities below:
 	#' \itemize{
 	#'    \item theta: \eqn{f(x)}, original point estimate of the parameter of
@@ -73,10 +73,10 @@
 	#' 	  \item `sdjack` is the jackknife estimate
 	#'     of standard error for theta. 
 	#'}
-	#' \item __B.mean__ : bootstrap sample size B, and the mean of the B
+	#' \item B.mean: bootstrap sample size B, and the mean of the B
 	#'     bootstrap replications \eqn{\hat{\theta^*}}
 	#'
-	#' \item __ustats__ : The bias-corrected estimator `2 * t0 - mean(tt)`,
+	#' \item ustats: The bias-corrected estimator `2 * t0 - mean(tt)`,
 	#'     and an estimate, `sdu`, of its sampling error
 #' }
 #' 
@@ -86,9 +86,11 @@
 #' @references Efron, Brad, and Balasubramanian Narasimhan. The Automatic 
 #' 		Construction of Bootstrap Confidence Intervals. 2018.
 #' @importFrom magrittr %>%
-#' @importFrom tibble tibble
-#' @importFrom purrr map map2_df map_df
+#' @importFrom tibble tibble as_tibble
+#' @importFrom purrr map map2_df map_df rerun
 #' @importFrom stats cov dnorm lm pnorm qnorm runif sd var
+#' @importFrom furrr future_map_dbl future_map 
+#' @importFrom future plan multiprocess
 
 
 
@@ -98,7 +100,8 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
                  iereps = 2, J = 10, alpha = c(0.025, 0.05, 0.1),
                  progress = TRUE, num_workers = 4){
 
-	plan(multiprocess(workers = eval(num_workers)))
+	# WHY CANT I PASS IN NUM_WORKERS
+	future::plan(future::multiprocess(workers = 4))
 
 	n <- nrow(df)
 	t0 <- est(df, ...)
@@ -107,14 +110,14 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	bootstrap_indicies <- rerun(B, sample(n, n, replace = TRUE))
 	theta_boot <-
 	  bootstrap_indicies %>%
-	  future_map_dbl(function(i) {est(df[i,])}, .progress = progress)
+	  future_map_dbl(function(i) {est(df[i,], ...)}, .progress = progress)
 	z0 <- qnorm(sum(theta_boot < t0)/B)
 	sdboot <- sd(theta_boot)
 	theta_boot_mean <- mean(theta_boot)
 
 	# calculate a and jacknife standard error
 	jackoutput <-
-	  rerun(jreps, furrrjack(df, est, jcount, n)) %>%
+	  rerun(jreps, furrrjack(df, est, jcount, ...)) %>%
 	  bind_rows() %>%
 	  colMeans() %>%
 	  as.list()
@@ -203,6 +206,39 @@ furrrgi <- function(alpha, theta_star, t0, a){
 }
 
 
+# function that takes in data, function to estimate, jcount, jreps,
+#   and spits out the value accelaration value a and jacknife standard deviation
+# jcount is how many jacknifes we want to do, defaulting to number of rows
+# jreps is the number of times we want to do the random jacknife
+furrrjack <- function(df, est, jcount, ...) {
+	n <- nrow(df)
+	r <- n %% jcount
+
+	# create list of index sets to be jacknifed
+	indicies <-
+	  sample(1:n, n-r) %>%
+	  matrix(jcount) %>%
+	  t() %>%
+	  as_tibble() %>%
+	  as.list()
+
+	# estimates theta without sampled subgroup
+	theta_j <-
+	  indicies %>%
+	  future_map_dbl(function(x)
+	    est(df[-unlist(x),], ...)) %>%
+	  unname()
+
+	# calculate acceleration a and jacknife standard error
+	theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
+	a_j <- 1/6 * sum((theta_j - theta_dot)^3) /
+	((sum((theta_j - theta_dot)^2))^1.5)
+	se_j <- sqrt(sum(theta_dot^2)) / sqrt(jcount * (jcount - 1))
+
+	return(list(a = a_j, se = se_j))
+}
+
+
 # Function for calculating the internal error of the confidence limits
 # These use a different jackknife calculation, which are based on the
 # original B bootstrap replications.
@@ -239,35 +275,3 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
 	return(int_sd)
 }
 
-
-# function that takes in data, function to estimate, jcount, jreps,
-#   and spits out the value accelaration value a and jacknife standard deviation
-# jcount is how many jacknifes we want to do, defaulting to number of rows
-# jreps is the number of times we want to do the random jacknife
-furrrjack <- function(df, est, jcount,...) {
-	n <- nrow(df)
-	r <- n %% jcount
-
-	# create list of index sets to be jacknifed
-	indicies <-
-	  sample(1:n, n-r) %>%
-	  matrix(jcount) %>%
-	  t() %>%
-	  as_tibble() %>%
-	  as.list()
-
-	# estimates theta without sampled subgroup
-	theta_j <-
-	  indicies %>%
-	  future_map_dbl(function(x)
-	    est(df[-unlist(x),])) %>%
-	  unname()
-
-	# calculate acceleration a and jacknife standard error
-	theta_dot <- (mean(theta_j) - theta_j) * (jcount - 1)
-	a_j <- 1/6 * sum((theta_j - theta_dot)^3) /
-	((sum((theta_j - theta_dot)^2))^1.5)
-	se_j <- sqrt(sum(theta_dot^2)) / sqrt(jcount * (jcount - 1))
-
-	return(list(a = a_j, se = se_j))
-}
