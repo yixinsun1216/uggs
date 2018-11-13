@@ -13,7 +13,10 @@ Imports: stats,
     furrr, 
     magrittr, 
     tibble, 
-    purrr
+    purrr,
+    future,
+    dplyr,
+    tidyr
 RoxygenNote: 6.1.1
 Suggests: 
     testthat
