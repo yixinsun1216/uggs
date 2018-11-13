@@ -4,8 +4,9 @@ Title: Bias Corrected and Accelerated Bootstrap Confidence Limits
 Version: 0.1.0
 Authors: Eric Karsten and Yixin Sun
 Maintenance: ysun@uchicago.edu
-Description: Computation of bootstrap confidence intervals, built on the 
-             bcaboot package https://github.com/bnaras/bcaboot
+Description: Computation of bootstrap confidence intervals, based on the 
+             bcaboot package https://github.com/bnaras/bcaboot, and implementing
+             parallel computing using the future package.
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
