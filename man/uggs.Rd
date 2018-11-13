@@ -47,8 +47,6 @@ computed}
 \item{num_workers}{the number of workers used for parallel processing}
 }
 \value{
-a named list
-
 \itemize{
 \item limits: four columns housing information on confidence limits
 \itemize{	
