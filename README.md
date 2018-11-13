@@ -4,7 +4,7 @@ A package that builds on the [bcaboot](https://github.com/bnaras/bcaboot) packag
 By implementing parallel computing using the [furrr](https://github.com/DavisVaughan/furrr) package, we are able to make substantial speed improvements.
 
 For further information the bca bootstrapping method, refer to 
-* Computer Age Satistical Inference found [here]
+* Computer Age Satistical Inference found [here](https://web.stanford.edu/~hastie/CASI/order.html)
 * Or the [manual](https://statweb.stanford.edu/~ckirby/brad/papers/2018Automatic-Construction-BCIs.pdf) for `bcaboot`
 
 # Installation
