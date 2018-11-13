@@ -14,6 +14,6 @@ Imports: stats,
     magrittr, 
     tibble, 
     purrr
-RoxygenNote: 6.1.0
+RoxygenNote: 6.1.1
 Suggests: 
     testthat

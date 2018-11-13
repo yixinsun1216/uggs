@@ -45,7 +45,7 @@
 #' @param num_workers the number of workers used for parallel processing
 #' 
 #' 
-#' @return a named list
+#' @return
 #' 
 #' \itemize{
 	#' \item limits: four columns housing information on confidence limits
@@ -120,6 +120,8 @@
 #' @importFrom stats cov dnorm lm pnorm qnorm runif sd var
 #' @importFrom furrr future_map_dbl future_map 
 #' @importFrom future plan multiprocess
+#' @importFrom dplyr bind_rows group_by summarise right_join left_join
+#' @importFrom tidyr replace_na
 #' 
 
 
@@ -129,9 +131,10 @@
 uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
                  iereps = 2, J = 10, alpha = c(0.025, 0.05, 0.1),
                  progress = TRUE, num_workers = 4){
-
-	# WHY CANT I PASS IN NUM_WORKERS
-	future::plan(future::multiprocess(workers = 4))
+  
+  # this is a silly, but necessary workaround
+  num_workers <<- num_workers
+	plan(future::multiprocess(workers = num_workers))
 
 	n <- nrow(df)
 	t0 <- est(df, ...)
@@ -237,7 +240,7 @@ furrrgi <- function(alpha, theta_star, t0, a){
 
 
 # function that takes in data, function to estimate, jcount, jreps,
-#   and spits out the value accelaration value a and jacknife standard deviation
+# and spits out the value accelaration value a and jacknife standard deviation
 # jcount is how many jacknifes we want to do, defaulting to number of rows
 # jreps is the number of times we want to do the random jacknife
 furrrjack <- function(df, est, jcount, ...) {
@@ -299,7 +302,7 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
 
 	int_sd <-
 	  future_map(indicies, function(x) internal_jack(x)) %>%
-	  bind_rows %>%
+	  bind_rows() %>%
 	  map_df(function(x) {sd(x) * (J-1)/(sqrt(J))})
 
 	return(int_sd)
