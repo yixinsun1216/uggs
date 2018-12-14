@@ -43,6 +43,8 @@
 #' 		computed
 #' @param progress logical for a progress bar in bootstrap calculations
 #' @param num_workers the number of workers used for parallel processing
+#' @param ie_calc logical for whether or not we should calculate internal 
+#' 		standard errors
 #' 
 #' 
 #' @return
