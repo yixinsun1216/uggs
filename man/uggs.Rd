@@ -7,7 +7,7 @@
 \usage{
 uggs(df, B, est, ..., jcount = nrow(df), jreps = 5, iereps = 2,
   J = 10, alpha = c(0.025, 0.05, 0.1), progress = TRUE,
-  num_workers = 4)
+  num_workers = 4, ie_calc = FALSE)
 }
 \arguments{
 \item{df}{a dataframe with \eqn{n} rows, assumed to be independently sampled 
