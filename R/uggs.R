@@ -43,8 +43,6 @@
 #' 		computed
 #' @param progress logical for a progress bar in bootstrap calculations
 #' @param num_workers the number of workers used for parallel processing
-#' @param ie_calc logical for whether or not internal standard errors should be
-#' 		calculated
 #' 
 #' 
 #' @return
@@ -153,8 +151,7 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	theta_boot_mean <- mean(theta_boot)
 
 	# calculate a and jacknife standard error
-	print(paste("Calculating acceleration value using", jreps, 
-				"rounds of jackknifing"))
+	print(paste("Calculating acceleration value using", jreps, "rounds of jackknifing"))
 	jackoutput <-
 	  rerun(jreps, furrrjack(df, est, jcount, progress, ...)) %>%
 	  bind_rows() %>%
@@ -168,11 +165,9 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	# calculate internal errors and average across iereps calculations
 	# bind together stats and limits for outputting
 	if(ie_calc){
-		print(paste("Estimating internal error of confidence limits using", 
-					 iereps, "rounds of jackknifing"))
+		print(paste("Estimating internal error of confidence limits using", iereps, "rounds of jackknifing"))
 		ie <-
-		  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0, 
-		  						progress)) %>%
+		  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0, progress)) %>%
 		  bind_rows() %>%
 		  map_df(mean)
 		jacksd <- unlist(ie)[1:(length(alpha) * 2 + 1)]
@@ -315,11 +310,9 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0, progress){
 	}
 
 	int_sd <-
-	  future_map(indicies, function(x) internal_jack(x), 
-	  			 .progress = progress) %>%
+	  future_map(indicies, function(x) internal_jack(x), .progress = progress) %>%
 	  bind_rows() %>%
 	  map_df(function(x) {sd(x) * (J-1)/(sqrt(J))})
 
 	return(int_sd)
 }
-
