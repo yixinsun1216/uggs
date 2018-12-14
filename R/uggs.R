@@ -128,7 +128,7 @@
 #' @export
 uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
                  iereps = 2, J = 10, alpha = c(0.025, 0.05, 0.1),
-                 progress = TRUE, num_workers = 4){
+                 progress = TRUE, num_workers = 4, ie_calc = FALSE){
 
 	# WHY CANT I PASS IN NUM_WORKERS
 	future::plan(future::multiprocess(workers = 4))
@@ -157,18 +157,24 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	limits <- furrrgi(alpha, theta_boot, t0, ajack)
 
 	# calculate internal errors and average across iereps calculations
-	ie <-
-	  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0)) %>%
-	  bind_rows() %>%
-	  map_df(mean)
+	if(ie_calc){
+		ie <-
+		  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0)) %>%
+		  bind_rows() %>%
+		  map_df(mean)
+		jacksd <- unlist(ie)[1:(length(alpha) * 2 + 1)]
+		limits <- cbind(limits, jacksd)
+		jsd <- c(0, ie$sdboot, ie$z0, 0, 0)
+		stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$se), jsd))
+		rownames(stats) <- c("est", "jsd")	
+		colnames(stats) <- c("theta", "sdboot", "z0", "a", "sdjack")
+	}else{
+		stats <- c(t0, sdboot, z0, ajack, jackoutput$se)
+		rownames(stats) <- "est"
+	}
+	
 
-	jacksd <- unlist(ie)[1:(length(alpha) * 2 + 1)]
-	limits <- cbind(limits, jacksd)
 
-	jsd <- c(0, ie$sdboot, ie$z0, 0, 0)
-	stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$se), jsd))
-	rownames(stats) <- c("est", "jsd")
-	colnames(stats) <- c("theta", "sdboot", "z0", "a", "sdjack")
 
   # use total count vector to calculate sample error
 	Y <-
