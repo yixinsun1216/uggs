@@ -122,6 +122,7 @@
 #' @importFrom future plan multiprocess
 #' @importFrom dplyr bind_rows group_by summarise right_join left_join
 #' @importFrom tidyr replace_na
+#' @importFrom tictoc tic toc
 #' 
 
 
@@ -130,16 +131,17 @@
 #' @export
 uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
                  iereps = 2, J = 10, alpha = c(0.025, 0.05, 0.1),
-                 progress = TRUE, num_workers = 4){
-  
-  # this is a silly, but necessary workaround
-  num_workers <<- num_workers
+                 progress = TRUE, num_workers = 4, ie_calc = FALSE){
+
+    # this is a silly, but necessary workaround
+    num_workers <<- num_workers
 	plan(future::multiprocess(workers = num_workers))
 
 	n <- nrow(df)
 	t0 <- est(df, ...)
 
 	# create B samples from df and pass each sample into estimator
+	print("Bootstrapping B samples and re-estimating theta")
 	bootstrap_indicies <- rerun(B, sample(n, n, replace = TRUE))
 	theta_boot <-
 	  bootstrap_indicies %>%
@@ -149,8 +151,9 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	theta_boot_mean <- mean(theta_boot)
 
 	# calculate a and jacknife standard error
+	print(paste("Calculating acceleration value using", jreps, "rounds of jackknifing"))
 	jackoutput <-
-	  rerun(jreps, furrrjack(df, est, jcount, ...)) %>%
+	  rerun(jreps, furrrjack(df, est, jcount, progress, ...)) %>%
 	  bind_rows() %>%
 	  colMeans() %>%
 	  as.list()
@@ -160,20 +163,26 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	limits <- furrrgi(alpha, theta_boot, t0, ajack)
 
 	# calculate internal errors and average across iereps calculations
-	ie <-
-	  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0)) %>%
-	  bind_rows() %>%
-	  map_df(mean)
-
-	jacksd <- unlist(ie)[1:(length(alpha) * 2 + 1)]
-	limits <- cbind(limits, jacksd)
-
-	jsd <- c(0, ie$sdboot, ie$z0, 0, 0)
-	stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$se), jsd))
-	rownames(stats) <- c("est", "jsd")
+	# bind together stats and limits for outputting
+	if(ie_calc){
+		print(paste("Estimating internal error of confidence limits using", iereps, "rounds of jackknifing"))
+		ie <-
+		  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0, progress)) %>%
+		  bind_rows() %>%
+		  map_df(mean)
+		jacksd <- unlist(ie)[1:(length(alpha) * 2 + 1)]
+		limits <- cbind(limits, jacksd)
+		jsd <- c(0, ie$sdboot, ie$z0, 0, 0)
+		stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$se), jsd))
+		rownames(stats) <- c("est", "jsd")	
+		toc()
+	}else{
+		stats <- cbind(t0, sdboot, z0, ajack, jackoutput$se)
+		rownames(stats) <- "est"
+	}
 	colnames(stats) <- c("theta", "sdboot", "z0", "a", "sdjack")
 
-  # use total count vector to calculate sample error
+  	# use total count vector to calculate sample error
 	Y <-
 	  bootstrap_indicies %>%
 	  unlist() %>%
@@ -227,7 +236,7 @@ furrrgi <- function(alpha, theta_star, t0, a){
 	# also compute usual standard errors
 	theta_std <- t0 + sdboot0 * qnorm(alpha)
 
-	# compute proportion of bootstrapped estimates which are less than conf limit
+	# compute proportion of bootstrapped estimates that are less than conf limit
 	pct <-
 	  theta_bca %>%
 	  map(function(x) sum(theta_star <= x) / B)
@@ -243,7 +252,7 @@ furrrgi <- function(alpha, theta_star, t0, a){
 # and spits out the value accelaration value a and jacknife standard deviation
 # jcount is how many jacknifes we want to do, defaulting to number of rows
 # jreps is the number of times we want to do the random jacknife
-furrrjack <- function(df, est, jcount, ...) {
+furrrjack <- function(df, est, jcount, progress, ...) {
 	n <- nrow(df)
 	r <- n %% jcount
 
@@ -259,7 +268,7 @@ furrrjack <- function(df, est, jcount, ...) {
 	theta_j <-
 	  indicies %>%
 	  future_map_dbl(function(x)
-	    est(df[-unlist(x),], ...)) %>%
+	    est(df[-unlist(x),], ...), .progress = progress) %>%
 	  unname()
 
 	# calculate acceleration a and jacknife standard error
@@ -277,7 +286,7 @@ furrrjack <- function(df, est, jcount, ...) {
 # original B bootstrap replications.
 # The B-vector theta_star is divided into J groups, and each group is deleted
 # in turn to recompute the limits.
-furrrie <- function(theta_star, B, J, ajack, alpha, t0){
+furrrie <- function(theta_star, B, J, ajack, alpha, t0, progress){
 	indicies <-
 	  sample(B, B - B %% J) %>%
 	  matrix(J) %>%
@@ -290,7 +299,7 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
 		Bj <- length(ttj)
 		sdboot <- sd(ttj)
 		z0 <- qnorm(sum(ttj < t0)/B)
-		limit_j <- unlist(furrrgi(alpha, ttj, t0, ajack)[,"bca"]) %>% as.numeric()
+		limit_j <- as.numeric(unlist(furrrgi(alpha, ttj, t0, ajack)[,"bca"]))
 		out <- c(limit_j, sdboot, z0)
 
 		nalpha <- alpha[alpha < 0.5]
@@ -301,7 +310,7 @@ furrrie <- function(theta_star, B, J, ajack, alpha, t0){
 	}
 
 	int_sd <-
-	  future_map(indicies, function(x) internal_jack(x)) %>%
+	  future_map(indicies, function(x) internal_jack(x), .progress = progress) %>%
 	  bind_rows() %>%
 	  map_df(function(x) {sd(x) * (J-1)/(sqrt(J))})
 
