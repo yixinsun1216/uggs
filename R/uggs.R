@@ -124,7 +124,6 @@
 #' @importFrom future plan multiprocess
 #' @importFrom dplyr bind_rows group_by summarise right_join left_join
 #' @importFrom tidyr replace_na
-#' @importFrom tictoc tic toc
 #' 
 
 
@@ -153,7 +152,8 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	theta_boot_mean <- mean(theta_boot)
 
 	# calculate a and jacknife standard error
-	print(paste("Calculating acceleration value using", jreps, "rounds of jackknifing"))
+	print(paste("Calculating acceleration value using", jreps, 
+				"rounds of jackknifing"))
 	jackoutput <-
 	  rerun(jreps, furrrjack(df, est, jcount, progress, ...)) %>%
 	  bind_rows() %>%
@@ -167,7 +167,8 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	# calculate internal errors and average across iereps calculations
 	# bind together stats and limits for outputting
 	if(ie_calc){
-		print(paste("Estimating internal error of confidence limits using", iereps, "rounds of jackknifing"))
+		print(paste("Estimating internal error of confidence limits using", 
+					iereps, "rounds of jackknifing"))
 		ie <-
 		  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0, progress)) %>%
 		  bind_rows() %>%
@@ -177,7 +178,6 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 		jsd <- c(0, ie$sdboot, ie$z0, 0, 0)
 		stats <- t(cbind(c(t0, sdboot, z0, ajack, jackoutput$se), jsd))
 		rownames(stats) <- c("est", "jsd")	
-		toc()
 	}else{
 		stats <- cbind(t0, sdboot, z0, ajack, jackoutput$se)
 		rownames(stats) <- "est"
