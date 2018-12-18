@@ -130,7 +130,7 @@
 
 # Main function
 #' @export
-uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
+uggs <- function(df, B, est, ..., jcount = 100, jreps = 5,
                  iereps = 2, J = 10, alpha = c(0.025, 0.05, 0.1),
                  progress = TRUE, num_workers = 4, ie_calc = FALSE){
 
@@ -142,7 +142,7 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	t0 <- est(df, ...)
 
 	# create B samples from df and pass each sample into estimator
-	print("Bootstrapping B samples and re-estimating theta")
+	print("Bootstrapping ", B, " samples and re-estimating theta")
 	bootstrap_indicies <- rerun(B, sample(n, n, replace = TRUE))
 	theta_boot <-
 	  bootstrap_indicies %>%
@@ -153,7 +153,7 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 
 	# calculate a and jacknife standard error
 	print(paste("Calculating acceleration value using", jreps, 
-				"rounds of jackknifing"))
+				"rounds of ", jcount, " jackknife groups"))
 	jackoutput <-
 	  rerun(jreps, furrrjack(df, est, jcount, progress, ...)) %>%
 	  bind_rows() %>%
@@ -168,7 +168,7 @@ uggs <- function(df, B, est, ..., jcount = nrow(df), jreps = 5,
 	# bind together stats and limits for outputting
 	if(ie_calc){
 		print(paste("Estimating internal error of confidence limits using", 
-					iereps, "rounds of jackknifing"))
+					iereps, "rounds of ", J, " jackknife groups"))
 		ie <-
 		  rerun(iereps, furrrie(theta_boot, B, J, ajack, alpha, t0, progress)) %>%
 		  bind_rows() %>%
